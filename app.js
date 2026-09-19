@@ -143,9 +143,12 @@ async function assignDocNumberAsync(record) {
 function renderShell() {
   const showUsersTab = isAdmin();
   const sessionBadge = state.session
-    ? `<button class="session-badge" id="btn-logout" type="button" title="Apasă pentru a ieși din cont">
-         ${esc(state.session.nume)} ${state.session.rol === "admin" ? "· admin" : ""} ⎋
-       </button>`
+    ? `<div class="session-badge-group">
+         <button class="session-badge" id="btn-change-pin" type="button" title="Schimbă-ți codul PIN">
+           ${esc(state.session.nume)} ${state.session.rol === "admin" ? "· admin" : ""} — Schimbă PIN
+         </button>
+         <button class="session-badge" id="btn-logout" type="button" title="Apasă pentru a ieși din cont">⎋ Ieșire</button>
+       </div>`
     : "";
 
   document.getElementById("app").innerHTML = `
@@ -179,6 +182,7 @@ function renderShell() {
   }
   if (state.session) {
     document.getElementById("btn-logout").addEventListener("click", logout);
+    document.getElementById("btn-change-pin").addEventListener("click", promptChangeOwnPin);
   }
 }
 

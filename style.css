@@ -515,10 +515,14 @@ canvas.sig-pad {
   margin-bottom: 10px;
 }
 
-.session-badge {
+.session-badge-group {
   position: absolute;
   top: 14px;
   right: 16px;
+  display: flex;
+  gap: 6px;
+}
+.session-badge {
   background: rgba(255,255,255,0.14);
   color: white;
   border: none;
@@ -526,6 +530,7 @@ canvas.sig-pad {
   padding: 5px 12px;
   font-size: 12px;
   font-weight: 600;
+  white-space: nowrap;
 }
 
 /* ---------- Administrare utilizatori ---------- */

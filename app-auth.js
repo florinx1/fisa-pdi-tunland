@@ -112,6 +112,35 @@ function logout() {
   renderLoginScreen();
 }
 
+// Disponibil oricărui cont logat (nu doar admin) — fiecare își schimbă
+// propriul PIN. Verificat pe server (schimbă rândul din Sheet-ul
+// "Utilizatori"), nu doar local, ca noul PIN să fie valabil de pe orice
+// dispozitiv de pe care se loghează ulterior.
+async function promptChangeOwnPin() {
+  if (!backendConfigured()) {
+    alert("Schimbarea PIN-ului necesită backend-ul (Apps Script) configurat.");
+    return;
+  }
+  const oldPin = prompt("Codul PIN actual:");
+  if (oldPin === null || oldPin.trim() === "") return;
+  const newPin = prompt("Noul cod PIN (minim 4 cifre):");
+  if (newPin === null || newPin.trim() === "") return;
+  const confirmPin = prompt("Confirmă noul cod PIN:");
+  if (confirmPin === null) return;
+  if (newPin.trim() !== confirmPin.trim()) {
+    alert("Codurile introduse nu coincid — încearcă din nou.");
+    return;
+  }
+  const result = await apiChangeOwnPin(state.session.nume, oldPin.trim(), newPin.trim());
+  if (result && result.ok) {
+    state.session.pin = newPin.trim();
+    saveSession(state.session);
+    showToast("PIN schimbat cu succes.");
+  } else {
+    alert((result && result.error) || "Eroare la schimbarea PIN-ului.");
+  }
+}
+
 // ---------------- Ecranul de administrare utilizatori ----------------
 
 function renderUsersAdmin() {
