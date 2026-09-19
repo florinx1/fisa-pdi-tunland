@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Fișă PDI Tunland G7 — Inter Cargo Grup</title>
+<meta name="theme-color" content="#122A4E">
+<meta name="description" content="Fișă digitală de predare-primire vehicul și inspecție PDI — Inter Cargo Grup">
+
+<!-- PWA -->
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Fișă PDI ICG">
+<link rel="icon" href="icons/icon-192.png">
+
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div id="app">
+  <div style="padding:40px; text-align:center; color:#3F5C7A; font-family:sans-serif;">Se încarcă…</div>
+</div>
+
+<!-- imagini ascunse, folosite ca sursă pentru siglele complete (icon + text) la generarea PDF -->
+<img id="logo-for-pdf" src="logo-full-white.png" style="display:none" crossorigin="anonymous"
+     onerror="this.removeAttribute('src')">
+<img id="foton-logo-for-pdf" src="foton-logo-full.png" style="display:none" crossorigin="anonymous"
+     onerror="this.removeAttribute('src')">
+
+<!-- jsPDF (generare PDF direct pe dispozitiv, funcționează și offline după prima încărcare) -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+<script src="fonts.js"></script>
+<script src="data.js"></script>
+<script src="app-pdf.js"></script>
+<script src="app-signature.js"></script>
+<script src="app-form.js"></script>
+<script src="app-archive.js"></script>
+<script src="app-pending.js"></script>
+<script src="app-sync.js"></script>
+<script src="app-auth.js"></script>
+<script src="app.js"></script>
+
+</body>
+</html>
