@@ -5,7 +5,7 @@
 
 // !!! După ce publici Apps Script-ul ca Web App, pune URL-ul aici !!!
 const CONFIG = {
-  APPS_SCRIPT_URL: "https://script.google.com/macros/s/AKfycbxQbJ9YToh208dXSEgOG4s1QOGc2o5MNRwOIhc_OsD0BYSY72s7OwIcwDFTFPb5nBJkXw/exec",
+  APPS_SCRIPT_URL: "", // ex: "https://script.google.com/macros/s/AKfycb.../exec"
   COMPANY_NAME: "INTER CARGO GRUP",
   COMPANY_SUB: "Distribuitor comercial  •  Bragadiru, jud. Ilfov, România",
   COMPANY_DEPT: "Departament Aftersales & Piese de schimb",
@@ -248,18 +248,25 @@ const FUEL_STEPS = ["1/8", "2/8", "3/8", "4/8", "5/8", "6/8", "7/8", "Plin"];
 // vehiculele electrice. Se stochează procentul direct (nu un index).
 const BATERIE_STEPS = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100];
 
-// ---------- Liste de personal (editează aici numele, fără să atingi restul codului) ----------
+// ---------- Liste de personal ----------
 // Aceste nume apar ca listă derulantă la secțiunea 6 (Confirmare predare-primire).
 // Persoana care PREDĂ vehiculul din partea ICG — se alege din agenții de vânzări.
 // Tehnicianul care face INSPECȚIA PDI — se alege din personalul de service.
-// Exemplu: const VANZATORI = ["Popescu Andrei", "Ionescu Maria"];
+//
+// Cu backend-ul (Apps Script) configurat, aceste liste NU se mai editează
+// aici — se preiau automat, la pornirea aplicației, din tab-urile "Vanzatori"
+// și "PersonalService" ale Sheet-ului (vezi refreshListePersonal în
+// app-sync.js), pe care Florin le completează direct în Drive, fără cod.
+// Array-urile de mai jos rămân doar ca fallback: valabile offline, înainte de
+// primul răspuns de la server, sau dacă backend-ul nu e configurat deloc.
+// Exemplu: let VANZATORI = ["Popescu Andrei", "Ionescu Maria"];
 
-const VANZATORI = [
+let VANZATORI = [
   // "Popescu Andrei",
   // "Ionescu Maria",
 ];
 
-const PERSONAL_SERVICE = [
+let PERSONAL_SERVICE = [
   // "Georgescu Mihai",
   // "Stan Radu",
 ];

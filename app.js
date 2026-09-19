@@ -99,6 +99,7 @@ function init() {
 function bootstrapAfterLogin() {
   if (__appBootstrapped) { renderShell(); render(); return; }
   __appBootstrapped = true;
+  applyCachedListePersonal(); // varianta locală cunoscută, disponibilă instant, înainte de răspunsul de rețea
   state.records = loadRecords();
   renderShell();
   startNewOrResumeDraft();
@@ -111,6 +112,12 @@ function bootstrapAfterLogin() {
   }
   // încearcă sincronizarea fișelor nesincronizate, dacă avem URL configurat și suntem online
   trySyncPending();
+  // preia lista actuală de Vânzători/Personal service din Sheet — re-randăm
+  // doar dacă s-a schimbat față de ce era deja afișat, și doar dacă persoana
+  // e încă pe fișa curentă (altfel i-am rescrie ecranul de sub ochi)
+  refreshListePersonal().then(changed => {
+    if (changed && state.tab === "form") render();
+  });
 }
 
 function startNewOrResumeDraft() {

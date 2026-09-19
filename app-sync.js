@@ -220,6 +220,61 @@ async function fetchOpenRecords() {
   }
 }
 
+// ---------------- Liste de personal (Vânzători / Personal service) ----------------
+// Florin completează aceste două liste direct în Sheet (tab-urile "Vanzatori"
+// și "PersonalService", un nume pe rând) — aplicația le preia de acolo la
+// fiecare pornire și le ține și într-un cache local, ca dropdown-urile din
+// secțiunea de semnături să nu rămână goale dacă nu există semnal chiar în
+// momentul deschiderii aplicației (ex. atelier fără net stabil).
+
+const LISTE_PERSONAL_CACHE_KEY = "icg_fise_pdi_liste_personal_v1";
+
+function loadCachedListePersonal() {
+  try {
+    const raw = localStorage.getItem(LISTE_PERSONAL_CACHE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch (e) {
+    return null;
+  }
+}
+
+function saveCachedListePersonal(liste) {
+  try {
+    localStorage.setItem(LISTE_PERSONAL_CACHE_KEY, JSON.stringify(liste));
+  } catch (e) { /* best-effort */ }
+}
+
+// Sincronă — aplică imediat ultima variantă cunoscută local, înainte ca
+// prima randare a formularului să aibă loc (altfel dropdown-urile ar apărea
+// goale o clipă, apoi s-ar "umple" abia după ce sosește răspunsul de rețea).
+function applyCachedListePersonal() {
+  const cached = loadCachedListePersonal();
+  if (cached) {
+    if (Array.isArray(cached.vanzatori)) VANZATORI = cached.vanzatori;
+    if (Array.isArray(cached.personalService)) PERSONAL_SERVICE = cached.personalService;
+  }
+}
+
+// Asincronă — preia varianta curentă de pe server și o suprascrie pe cea din
+// memorie + cache. Returnează true dacă listele s-au schimbat față de ce era
+// deja afișat (ca apelantul să decidă dacă merită un re-render).
+async function refreshListePersonal() {
+  if (!backendConfigured()) return false;
+  try {
+    const res = await fetch(`${CONFIG.APPS_SCRIPT_URL}?action=getListe`);
+    const json = await res.json();
+    if (!json || !json.ok) return false;
+    const before = JSON.stringify({ vanzatori: VANZATORI, personalService: PERSONAL_SERVICE });
+    VANZATORI = json.vanzatori || [];
+    PERSONAL_SERVICE = json.personalService || [];
+    saveCachedListePersonal({ vanzatori: VANZATORI, personalService: PERSONAL_SERVICE });
+    return before !== JSON.stringify({ vanzatori: VANZATORI, personalService: PERSONAL_SERVICE });
+  } catch (e) {
+    console.warn("Nu am putut prelua listele de personal de pe server — folosesc ultima variantă cunoscută", e);
+    return false;
+  }
+}
+
 // ---------------- Autentificare & administrare conturi ----------------
 // Contul e verificat pe server (Sheet-ul "Utilizatori"), nu doar local —
 // altfel un cont dezactivat de admin ar rămâne funcțional pe un telefon
