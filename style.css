@@ -40,13 +40,15 @@ html, body {
   align-items: center;
   gap: 10px;
 }
-.app-header .brand img {
-  height: 30px;
+.app-header .brand img.brand-logo {
+  height: 26px;
   width: auto;
   object-fit: contain;
-  border-radius: 6px;
-  background: white;
-  padding: 3px 6px;
+}
+.brand-divider {
+  width: 1px;
+  height: 22px;
+  background: rgba(255,255,255,0.3);
 }
 .app-header .brand-text .name {
   font-weight: 700;

@@ -151,7 +151,9 @@ function renderShell() {
   document.getElementById("app").innerHTML = `
     <header class="app-header">
       <div class="brand">
-        <img src="${CONFIG.LOGO_URL}" onerror="this.style.display='none'" alt="logo">
+        <img src="logo-full-white.png" onerror="this.style.display='none'" alt="Inter Cargo Grup" class="brand-logo brand-logo-icg">
+        <div class="brand-divider"></div>
+        <img src="foton-logo-full-white.png" onerror="this.style.display='none'" alt="FOTON" class="brand-logo brand-logo-foton">
         <div class="brand-text">
           <div class="sub">${CONFIG.COMPANY_SUB}</div>
         </div>
