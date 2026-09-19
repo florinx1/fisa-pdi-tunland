@@ -42,13 +42,26 @@ function startNewFisa() {
   state.current = emptyRecord();
   state.current.creatDe = (state.session && state.session.nume) || "";
   state.current.creatRol = (state.session && state.session.rol) || "";
+  state.tab = "form";
   render();
   assignDocNumberAsync(state.current);
 }
 
+// Afișat pe tab-ul "Fișă curentă" atunci când nu există nicio fișă deschisă
+// (ex: chiar după finalizare/trimitere) — tab-ul "Start" e locul unde se
+// alege explicit fișă nouă / preia fișă, deci aici doar îndrumăm într-acolo.
+function renderEmptyFormPlaceholder() {
+  return `
+    <div class="start-screen">
+      <div class="start-title">Nu ai nicio fișă deschisă momentan.</div>
+      <div class="note" style="margin-top:8px;">Mergi pe tab-ul <b>Start</b> pentru a începe o fișă nouă sau a prelua una din „Fișe în așteptare”.</div>
+    </div>
+  `;
+}
+
 function renderForm() {
   const r = state.current;
-  if (!r) return renderStartScreen();
+  if (!r) return renderEmptyFormPlaceholder();
   const v = r.vehicul, c = r.client, d = r.documente, a = r.accesorii, p = r.pdi, s = r.semnaturi;
 
   return `
@@ -61,10 +74,14 @@ function renderForm() {
 
     ${shareBannerHtml(r)}
 
-    <div class="grid3">
+    <div class="grid4">
       <div class="field">
-        <label>Data livrării</label>
+        <label>Data programată livrare</label>
         <input type="date" id="f-dataLivrarii" value="${r.dataLivrarii || ""}">
+      </div>
+      <div class="field">
+        <label>Ora programată livrare</label>
+        <input type="time" id="f-oraLivrarii" value="${r.oraLivrarii || ""}">
       </div>
       <div class="field" style="grid-column: span 2;">
         <label>Locația livrării</label>
@@ -74,6 +91,7 @@ function renderForm() {
         </div>
       </div>
     </div>
+    ${r.dataLivrarii && r.oraLivrarii ? `<div class="note" style="margin-top:6px;">Fișa ar trebui finalizată și salvată cu cel puțin 2 ore înainte de data și ora de mai sus — vezi „Fișe în așteptare” pentru starea curentă.</div>` : ""}
 
     <div class="section-bar">1&nbsp;&nbsp;Date vehicul</div>
     <div class="section-body">
@@ -162,13 +180,12 @@ function renderForm() {
         <label>Observații documente</label>
         <textarea id="f-obsDocumente">${esc(d.observatii)}</textarea>
       </div>
-      <div class="note" style="margin-top:10px;">
-        Predarea efectivă a mașinii către client se face de obicei chiar acum, de către
-        vânzător — de aceea semnăturile ICG și client sunt aici, nu la finalul fișei
-        (care e salvată de altcineva, din service, mai târziu).
-      </div>
       ${sigBlockHtml("icg", "Predat de (ICG)", s.icgNume, s.icgSemnatura, VANZATORI)}
-      ${sigBlockHtml("client", "Primit de (client)", s.clientNume, s.clientSemnatura, null)}
+      <div class="sig-block">
+        <div class="sig-title">Primit de (client)</div>
+        <div class="field"><label>Nume</label><input type="text" id="f-sig-client-nume" value="${esc(s.clientNume)}"></div>
+        <div class="note" style="margin:6px 0 0;">Clientul semnează olograf pe versiunea tipărită a fișei — nu în aplicație.</div>
+      </div>
       ${verificareBlockHtml("vanzari", r.verificareVanzari)}
     </div>
 
@@ -411,7 +428,7 @@ function fotoSlotHtml(ft, value) {
 
 function afterFormRender() {
   const r = state.current;
-  if (!r) { wireStartScreen(); return; }
+  if (!r) return; // renderEmptyFormPlaceholder() nu are nimic de legat
   const bind = (id, path, transform) => {
     const el = document.getElementById(id);
     if (!el) return;
@@ -427,6 +444,7 @@ function afterFormRender() {
   };
 
   bind("f-dataLivrarii", "dataLivrarii");
+  bind("f-oraLivrarii", "oraLivrarii");
 
   // Butonul "Tip motorizare" schimbă ce apare la secțiunile 4 (accesorii) și
   // 5 (PDI), plus selectorul nivel combustibil/baterie din secțiunea 1 — de
@@ -541,8 +559,9 @@ function afterFormRender() {
     });
   });
 
-  // semnături
-  ["icg", "pdi", "client"].forEach(who => initSignaturePad(who, r));
+  // semnături — clientul nu mai semnează digital (vezi nota din secțiunea 3),
+  // deci are doar câmp de nume, fără canvas
+  ["icg", "pdi"].forEach(who => initSignaturePad(who, r));
   document.querySelectorAll("[data-clear-sig]").forEach(btn => {
     btn.addEventListener("click", () => {
       const who = btn.dataset.clearSig;
@@ -645,7 +664,7 @@ async function handleVerifClick(kind, value) {
   }
   // revine la ecranul de pornire (Fișă nouă / Preia fișă), ca operatorul să
   // nu rămână "blocat" pe o fișă care nu mai e (momentan) în sarcina lui
-  if (state.current === r) state.current = null;
+  if (state.current === r) { state.current = null; state.tab = "start"; }
   render();
 }
 
@@ -865,6 +884,10 @@ async function finalizeCurrentRecord() {
     if (!confirm("Numele clientului nu este completat. Continui oricum?")) return;
   }
 
+  // plasă de siguranță: dacă vreo semnătură a rămas doar ca link către Drive
+  // (trimisă de pe alt dispozitiv), o aducem acum, ca PDF-ul să nu iasă fără ea
+  await ensureSignaturesHydrated(r);
+
   if (r.status === "finalizat" && r._lastFinalizedSnapshot === computeRecordSnapshot(r)) {
     showToast(`Fișa ${r.docNumber} este deja salvată — nu s-a schimbat nimic.`, 3000);
     return;
@@ -881,5 +904,6 @@ async function finalizeCurrentRecord() {
   await syncRecord(r);
   showToast(`Fișă ${r.docNumber} finalizată`);
   state.current = null;
+  state.tab = "start";
   render();
 }

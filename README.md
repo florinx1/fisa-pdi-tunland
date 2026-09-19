@@ -160,6 +160,29 @@ același subfolder existent, nu se creează unul nou.
 - Setul de poze cerute e editabil în `data.js`, la lista `FOTO_TIPURI`
   (poți adăuga, șterge sau redenumi tipuri de poze fără să atingi restul
   codului).
+- Apăsarea repetată a butonului „Finalizează" pentru **aceeași fișă** (același
+  număr de document) NU creează copii duplicate ale PDF-ului/pozelor în Drive
+  și nu adaugă rânduri duplicate în foaia „Fise" — fișierele cu același nume
+  sunt înlocuite, iar rândul din Sheet e actualizat, nu re-adăugat. Dacă
+  fișa e finalizată din nou fără nicio modificare față de ultima finalizare,
+  aplicația arată direct un mesaj „Fișa X este deja salvată" și nu mai
+  retrimite nimic la Drive/Sheet.
+
+## Ștergerea definitivă a unei fișe (doar admin)
+
+Utilă pentru curățarea fișelor de test create în timpul lansării, sau pentru
+corectarea unei fișe deschise din greșeală. Șterge o fișă din **toate**
+locurile unde ar putea exista deodată: draftul temporar (dacă mai era „în
+așteptare"), rândul finalizat din foaia „Fise" și folderul ei din Drive (PDF
++ poze). Operațiunea necesită backend-ul Apps Script configurat, e vizibilă
+doar unui cont **admin** și **nu poate fi anulată**.
+
+Se poate declanșa din două locuri:
+- Tab-ul **„Fișe în așteptare”** — fiecare card are, doar pentru admin, un
+  buton „Șterge (admin)”.
+- Tab-ul **„Arhivă”** — deschizi o fișă din listă, iar la promptul cu opțiuni
+  apare, doar pentru admin și doar dacă fișa are deja număr de document,
+  opțiunea „4” = șterge definitiv (Sheet + Drive).
 
 ## Autentificare și administrare conturi
 
@@ -199,18 +222,45 @@ Pe lângă arhiva locală (fișele de pe acel dispozitiv), tab-ul „Arhivă" ar
 indiferent pe ce dispozitiv au fost făcute — după VIN, nume client, număr
 de document sau număr de înmatriculare. Necesită backend-ul Apps Script
 configurat și conexiune la internet; rezultatele includ un link direct spre
-PDF-ul din Drive.
+PDF-ul din Drive și un buton **„Vezi poze”** — apăsat, aduce din Drive și
+afișează câte un link separat pentru fiecare poză a vehiculului (nu doar
+link-ul către tot folderul), ca să deschizi direct poza care te interesează.
 
 ## Structura fișei (capitole)
 
+Deasupra secțiunilor numerotate, chiar sub notă, sunt câmpurile **Data
+programată livrare** + **Ora programată livrare** și **Locația livrării** —
+completate de vânzător la deschiderea fișei (vezi „Alerta de 2 ore înainte
+de livrare” mai jos).
+
 1. Date vehicul (marcă și model din liste derulante separate, plus buton **Tip motorizare**: Termic (ICE) / Electric — vezi secțiunea dedicată mai jos)
 2. Date client
-3. **Documente** — se pregătesc de obicei de o persoană de la birou (manual, garanție, carnet service, CoC, C.I.V., factură)
+3. **Documente** — se pregătesc de obicei de o persoană de la birou (manual, garanție, carnet service, CoC, C.I.V., factură); la final, semnătura **„Predat de (ICG)”** (vânzătorul) și numele clientului care a primit mașina (clientul semnează olograf pe PDF-ul tipărit, nu în aplicație), apoi verificarea vânzătorului
 4. **Inventar accesorii** — diferă după tipul de motorizare (la termic: roată rezervă; la electric: cabluri de încărcare + kit reparație pană), plus elemente comune (pachet legislativ, trusă scule, covorașe, prelată, bare transversale, covor bena, extinctor, chei/cartele)
-5. **Inspecție tehnică PDI** — se completează de personalul din service, la mașină; diferă după tipul de motorizare (la electric: grup dedicat bateriei/propulsiei electrice, în loc de fluide motor)
+5. **Inspecție tehnică PDI** — se completează de personalul din service, la mașină; diferă după tipul de motorizare (la electric: grup dedicat bateriei/propulsiei electrice, în loc de fluide motor); la final, semnătura tehnicianului PDI, apoi verificarea service (acoperă și secțiunea 4)
 6. Observații generale
-7. Confirmare predare-primire (semnături)
-8. **Poze vehicul** — 9 poze obligatorii din punct de vedere al fluxului (dar neblocante la finalizare), făcute din cameră direct din aplicație — vezi secțiunea dedicată mai jos
+7. **Poze vehicul** — 9 poze obligatorii din punct de vedere al fluxului (dar neblocante la finalizare), făcute din cameră direct din aplicație — vezi secțiunea dedicată mai jos
+
+## Alerta de 2 ore înainte de livrare
+
+Vânzătorul completează, la începutul fișei, **Data programată livrare** și
+**Ora programată livrare** (ora efectivă la care mașina ajunge la client —
+nu neapărat aceeași zi cu pregătirea). Pe baza acestor două câmpuri, tab-ul
+**„Fișe în așteptare”** calculează automat, pentru fiecare fișă nefinalizată:
+
+- cu peste 2 ore înainte de livrare → fișa apare normal, fără avertizare;
+- **sub 2 ore** înainte de livrare → cardul fișei devine portocaliu, cu un
+  cronometru live care numără în jos timpul rămas până la ora programată, iar
+  în capul listei apare un banner roșu cu numărul de fișe urgente — vizibil
+  oricui deschide tab-ul, inclusiv administratorului;
+- **după** ora programată, dacă fișa tot nu e finalizată → cardul devine roșu
+  ("ÎNTÂRZIATĂ"), cu timpul scurs de la ora programată.
+
+Fișele urgente/întârziate apar primele în listă. E un indicator vizual în
+aplicație, calculat pe fiecare telefon în parte cât timp are tab-ul „Fișe în
+așteptare” deschis — nu trimite notificări reale către telefon (push), care
+ar necesita infrastructură suplimentară (server de notificări + integrare
+la nivel de sistem de operare).
 
 ## Flux de verificare vânzător ↔ service (Pass / Fail / Necesită intervenție)
 
@@ -241,6 +291,22 @@ nu mai e nevoie să apeși separat „Trimite fișa mai departe”. Colegul din
 service o preia cu numărul fișei, din tab-ul **Arhivă** → „Preia fișă de pe
 alt dispozitiv”, sau direct din tab-ul **Fișe în așteptare** (mai jos).
 
+**Tab-ul „Start”**: primul tab din bara de navigare, separat de „Fișă
+curentă”, cu două butoane mari: **„Fișă nouă”** (deschide o fișă complet
+nouă, cu număr de înregistrare nou, și te duce automat pe tab-ul „Fișă
+curentă”) și **„Preia fișă”** (duce direct la tab-ul „Fișe în așteptare”, ca
+să continuăm altă fișă trimisă de un coleg). Imediat ce cineva apasă un
+buton de verificare (Pass / Fail / Necesită intervenție) — la vânzător SAU
+la service — sau apasă „Finalizează și generează PDF”, fișa iese din
+formularul lui și aplicația revine automat pe tab-ul „Start”. Același lucru
+se întâmplă și imediat după logare, dacă nu exista deja o fișă lăsată
+deschisă pe acel dispozitiv. Scopul: operatorul nu rămâne "blocat" într-o
+fișă care nu mai e (momentan) în sarcina lui, și nu pornește din greșeală o
+fișă nouă goală peste una neterminată. Tab-ul „Fișă curentă” rămâne mereu
+disponibil separat în bara de navigare — dacă are deja o fișă deschisă,
+arată formularul; dacă nu, arată un mesaj scurt care trimite înapoi la
+„Start”.
+
 **Rezolvare și revenire la Pass**: dacă o verificare a fost respinsă (Fail /
 Necesită intervenție) și problema se rezolvă ulterior (documentul e adus,
 accesoriul e completat, defecțiunea e reparată), oricine poate reveni la
@@ -258,7 +324,9 @@ blocheze fișa.
 **Tab-ul „Fișe în așteptare”** — vizibil pentru oricine, arată toate fișele
 trimise mai departe (de pe orice dispozitiv) care nu au încă ambele
 verificări pe Pass, cu roșu pentru cele respinse/cu intervenție necesară,
-motivul și numele persoanei responsabile. Necesită backend-ul Apps Script
+motivul și numele persoanei responsabile, plus (portocaliu/roșu, cu
+cronometru) fișele apropiate de ora programată de livrare — vezi „Alerta de
+2 ore înainte de livrare” mai sus. Necesită backend-ul Apps Script
 configurat (secțiunea „Pasul 3” de mai sus) — fără el, tab-ul arată un mesaj
 explicativ. O fișă dispare automat din listă imediat ce e finalizată.
 
@@ -269,21 +337,35 @@ categorii, pașii de combustibil etc.) sunt în `data.js`, într-un format
 simplu de citit — poți adăuga/edita/șterge puncte fără să atingi restul
 codului.
 
-**Listele de nume** (tot în `data.js`):
+**Listele de nume — editabile direct în Sheet, fără cod** (cu backend-ul
+configurat): tab-urile **„Vanzatori"** și **„PersonalService"**, create automat
+de `setup()`, câte un nume pe rând, sub antet. Aplicația le preia automat la
+fiecare pornire (funcția `refreshListePersonal()` din `app-sync.js`), le
+ține și într-un cache local (pentru offline/prima secundă înainte de răspunsul
+de rețea), și le folosește la listele derulante din secțiunea de semnături:
+- **„Predat de (ICG)"** — populată din tab-ul „Vanzatori".
+- **„Inspecție PDI"** — populată din tab-ul „PersonalService".
+- **„Primit de (client)"** rămâne câmp text liber (numele clientului variază la fiecare fișă).
+
+Dacă adaugi/ștergi un nume în Sheet, apare/dispare din dropdown la următoarea
+deschidere a aplicației (sau la reîmprospătare) — nu mai trebuie nicio
+modificare de cod sau reîncărcare pe GitHub.
+
+**Fallback fără backend**: array-urile `VANZATORI`/`PERSONAL_SERVICE` din
+`data.js` rămân ca variantă de rezervă — se folosesc doar dacă backend-ul nu
+e configurat deloc, sau ca prim conținut afișat înainte de primul răspuns de
+la server:
 ```js
-const VANZATORI = [
+let VANZATORI = [
   "Popescu Andrei",
   "Ionescu Maria",
 ];
 
-const PERSONAL_SERVICE = [
+let PERSONAL_SERVICE = [
   "Georgescu Mihai",
   "Stan Radu",
 ];
 ```
-- **„Predat de (ICG)"** se alege dintr-o listă derulantă populată din `VANZATORI`.
-- **„Inspecție PDI"** se alege dintr-o listă derulantă populată din `PERSONAL_SERVICE`.
-- **„Primit de (client)"** rămâne câmp text liber (numele clientului variază la fiecare fișă).
 
 **Marcă și model** (tot în `data.js`) — la secțiunea 1 (Date vehicul), operatorul
 alege din două liste derulante separate, nu mai scrie de mână:

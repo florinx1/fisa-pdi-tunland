@@ -375,6 +375,7 @@ function emptyRecord() {
     creatRol: "",
 
     dataLivrarii: "",
+    oraLivrarii: "",        // ora programată livrării (HH:MM) — folosită pentru alerta de 2h din "Fișe în așteptare"
     locatieLivrare: "sediu", // sediu | extern
 
     vehicul: {
@@ -498,6 +499,7 @@ function normalizeRecord(rec) {
   rec.verificareService = rec.verificareService || { status: null, motiv: "", de: "", rol: "", data: "", rezolvatDe: "", rezolvatData: "" };
   rec.creatDe = rec.creatDe || "";
   rec.creatRol = rec.creatRol || "";
+  rec.oraLivrarii = rec.oraLivrarii || "";
   return rec;
 }
 

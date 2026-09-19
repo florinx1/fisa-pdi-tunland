@@ -7,7 +7,7 @@ const STORAGE_KEY = "icg_fise_pdi_v1";
 const NUMBERING_KEY = "icg_fise_pdi_next_local"; // fallback local counter dacă nu există backend încă
 
 let state = {
-  tab: "form",          // form | archive | pending | users
+  tab: "start",          // start | form | archive | pending | users
   current: null,        // recordul deschis în formular
   records: [],          // toate fișele cunoscute local (draft + sincronizate)
   archiveQuery: "",
@@ -122,12 +122,15 @@ function bootstrapAfterLogin() {
 
 function resumeOpenDraftIfAny() {
   // reluăm automat DOAR un draft lăsat deschis chiar de acest dispozitiv
-  // (ex: pagina a fost reîmprospătată în timp ce lucra la o fișă). Dacă nu
-  // există un astfel de draft, NU mai pornim automat o fișă nouă — utilizatorul
-  // alege explicit din ecranul de start ("Fișă nouă" / "Preia fișă"), ca să nu
-  // rămână cu fișe goale abandonate sau să deschidă din greșeală fișa altcuiva.
+  // (ex: pagina a fost reîmprospătată în timp ce lucra la o fișă) — și îl
+  // deschidem direct pe tab-ul "Fișă curentă". Dacă nu există un astfel de
+  // draft, NU mai pornim automat o fișă nouă — rămânem pe tab-ul "Start", cu
+  // cele două butoane ("Fișă nouă" / "Preia fișă"), ca utilizatorul să aleagă
+  // explicit, fără să rămână cu fișe goale abandonate sau să deschidă din
+  // greșeală fișa altcuiva.
   const openDraft = state.records.find(r => r.status === "draft" && r._openInForm);
   state.current = openDraft || null;
+  if (state.current) state.tab = "form";
 }
 
 // Atribuie un număr de înregistrare (de la backend dacă e configurat/online,
@@ -168,10 +171,11 @@ function renderShell() {
           </div>
         </div>
         ${sessionBadge}
-        <div class="title" id="header-title">Fișă de predare-primire vehicul</div>
+        <div class="title" id="header-title">Fișă predare-primire vehicul</div>
         <div class="doc-number-display" id="header-doc-number"></div>
       </header>
       <nav class="tabbar">
+        <button data-tab="start" id="tab-start">Start</button>
         <button data-tab="form" id="tab-form">Fișă curentă</button>
         <button data-tab="archive" id="tab-archive">Arhivă</button>
         <button data-tab="pending" id="tab-pending">Fișe în așteptare</button>
@@ -181,6 +185,7 @@ function renderShell() {
     <main id="main"></main>
     <div class="toast" id="toast"></div>
   `;
+  document.getElementById("tab-start").addEventListener("click", () => { state.tab = "start"; render(); });
   document.getElementById("tab-form").addEventListener("click", () => { state.tab = "form"; render(); });
   document.getElementById("tab-archive").addEventListener("click", () => { state.tab = "archive"; render(); });
   document.getElementById("tab-pending").addEventListener("click", () => { state.tab = "pending"; render(); });
@@ -194,40 +199,39 @@ function renderShell() {
 }
 
 function render() {
+  document.getElementById("tab-start").classList.toggle("active", state.tab === "start");
   document.getElementById("tab-form").classList.toggle("active", state.tab === "form");
   document.getElementById("tab-archive").classList.toggle("active", state.tab === "archive");
   document.getElementById("tab-pending").classList.toggle("active", state.tab === "pending");
   const usersTabEl = document.getElementById("tab-users");
   if (usersTabEl) usersTabEl.classList.toggle("active", state.tab === "users");
 
+  // titlul din antet rămâne mereu "Fișă predare-primire vehicul", indiferent de
+  // tab (setat o singură dată în renderShell) — doar zona de sub el (numărul
+  // fișei, numărul de fișe etc.) se schimbă în funcție de tab
   const main = document.getElementById("main");
-  if (state.tab === "form") {
+  if (state.tab === "start") {
+    main.innerHTML = renderStartScreen();
+    wireStartScreen();
+    document.getElementById("header-doc-number").textContent = "";
+  } else if (state.tab === "form") {
     main.innerHTML = renderForm();
     afterFormRender();
-    if (state.current) {
-      document.getElementById("header-title").textContent = "Fișă de predare-primire vehicul";
-      document.getElementById("header-doc-number").textContent = state.current.docNumber
-        ? state.current.docNumber
-        : "(număr atribuit la finalizare)";
-    } else {
-      document.getElementById("header-title").textContent = "Fisa PDI Tunland G7";
-      document.getElementById("header-doc-number").textContent = "";
-    }
+    document.getElementById("header-doc-number").textContent = state.current
+      ? (state.current.docNumber || "(număr atribuit la finalizare)")
+      : "";
   } else if (state.tab === "archive") {
     main.innerHTML = renderArchive();
     afterArchiveRender();
-    document.getElementById("header-title").textContent = "Arhivă fișe";
     document.getElementById("header-doc-number").textContent = `${state.records.length} fișe salvate`;
   } else if (state.tab === "pending") {
     main.innerHTML = renderPendingTab();
     afterPendingRender();
-    document.getElementById("header-title").textContent = "Fișe în așteptare";
     document.getElementById("header-doc-number").textContent = "";
   } else if (state.tab === "users") {
     if (!isAdmin()) { state.tab = "form"; render(); return; }
     main.innerHTML = renderUsersAdmin();
     afterUsersAdminRender();
-    document.getElementById("header-title").textContent = "Administrare utilizatori";
     document.getElementById("header-doc-number").textContent = "";
   }
 }

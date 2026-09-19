@@ -129,6 +129,71 @@ async function requestDocNumber() {
 // fiecare autosave, astfel încât altă persoană, pe alt dispozitiv, s-o poată
 // prelua după numărul de document și continua completarea.
 
+// O celulă din Google Sheet are o limită de ~50.000 de caractere. Poze DE LA
+// CAMERĂ nu ajung niciodată în draft (vezi mai jos), dar o SEMNĂTURĂ desenată
+// pe ecran, la rezoluția reală a telefonului, poate depăși SINGURĂ această
+// limită (verificat: o singură semnătură poate ajunge la 70-80.000 de
+// caractere) — motiv pentru care semnătura vânzătorului se pierdea la
+// predarea fișei către service. Peste acest prag, o urcăm direct în Drive și
+// trimitem în draft doar un link mic, în loc de imaginea completă.
+const SIGNATURE_INLINE_MAX_CHARS = 4000;
+
+async function offloadLargeSignatures_(record, recordForDraft) {
+  const s = record.semnaturi || {};
+  const keys = ["icg", "pdi", "client"];
+  for (const who of keys) {
+    const val = s[`${who}Semnatura`];
+    if (typeof val === "string" && val.indexOf("data:") === 0 && val.length > SIGNATURE_INLINE_MAX_CHARS) {
+      const dataBase64 = val.split(",")[1] || val;
+      const uploadResult = await apiUploadSignature(record, who, dataBase64);
+      if (uploadResult && uploadResult.ok) {
+        recordForDraft.semnaturi[`${who}Semnatura`] = { _driveRef: true, url: uploadResult.url, fileId: uploadResult.fileId };
+      }
+      // dacă upload-ul eșuează (ex. offline), lăsăm dataURL-ul mare — saveDraft_
+      // ar putea respinge celula prea mare, dar preferăm o eroare vizibilă
+      // ("nu s-a putut trimite") unei pierderi silențioase a semnăturii
+    }
+  }
+}
+
+async function apiUploadSignature(record, who, dataBase64) {
+  const res = await fetch(CONFIG.APPS_SCRIPT_URL, {
+    method: "POST",
+    headers: { "Content-Type": "text/plain;charset=utf-8" },
+    body: JSON.stringify({
+      action: "uploadSignature",
+      who,
+      dataBase64,
+      docNumber: record.docNumber,
+      vehicul: record.vehicul,
+      dataLivrarii: record.dataLivrarii,
+    }),
+  });
+  return await res.json();
+}
+
+async function apiGetSignatureImage(fileId) {
+  const res = await fetch(`${CONFIG.APPS_SCRIPT_URL}?action=getSignatureImage&fileId=${encodeURIComponent(fileId)}`);
+  return await res.json();
+}
+
+// Listă cu link direct către fiecare poză a vehiculului (nu folderul întreg),
+// citită la cerere din Drive — folosită de butonul "Vezi poze" din arhivă.
+async function apiListPhotos(folderUrl) {
+  if (!backendConfigured() || !folderUrl) return null;
+  try {
+    const res = await fetch(`${CONFIG.APPS_SCRIPT_URL}?action=listPhotos&folderUrl=${encodeURIComponent(folderUrl)}`);
+    const json = await res.json();
+    if (json && json.ok) return json.photos;
+    showToast((json && json.error) || "Nu s-au putut încărca pozele.");
+    return null;
+  } catch (e) {
+    console.error("Eroare listare poze", e);
+    showToast("Eroare de conexiune — încearcă din nou.");
+    return null;
+  }
+}
+
 async function pushDraft(record) {
   if (!backendConfigured()) return { ok: false, error: "Backend-ul (Apps Script) nu e configurat încă în data.js." };
   if (!record.docNumber) return { ok: false, error: "Fișa nu are încă un număr de document." };
@@ -138,6 +203,7 @@ async function pushDraft(record) {
     // direct în Drive, doar la finalizare (syncRecord); aici le excludem.
     const recordForDraft = stripTransient(record);
     delete recordForDraft.poze;
+    await offloadLargeSignatures_(record, recordForDraft);
     const res = await fetch(CONFIG.APPS_SCRIPT_URL, {
       method: "POST",
       headers: { "Content-Type": "text/plain;charset=utf-8" },

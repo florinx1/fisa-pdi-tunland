@@ -47,18 +47,43 @@ function renderCentralResults() {
   if (state.centralSearching) return `<div class="note">Se caută...</div>`;
   if (state.centralResults === null) return `<div class="note">Caută o fișă mai veche, indiferent pe ce dispozitiv a fost făcută.</div>`;
   if (state.centralResults.length === 0) return `<div class="empty-state">Niciun rezultat.</div>`;
-  return state.centralResults.map(r => `
-    <div class="user-card">
-      <div class="user-main">
-        <div class="user-name">${esc(r.clientNume) || "Client necompletat"}</div>
-        <div class="user-role">${esc(r.docNumber)} &nbsp;•&nbsp; ${esc(r.marcaModel)} &nbsp;•&nbsp; VIN: ${esc(r.vin) || "-"}${r.creatDe ? " &nbsp;•&nbsp; deschisă de " + esc(r.creatDe) : ""}</div>
+  return state.centralResults.map((r, idx) => `
+    <div class="user-card" style="flex-direction:column; align-items:stretch;">
+      <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap;">
+        <div class="user-main">
+          <div class="user-name">${esc(r.clientNume) || "Client necompletat"}</div>
+          <div class="user-role">${esc(r.docNumber)} &nbsp;•&nbsp; ${esc(r.marcaModel)} &nbsp;•&nbsp; VIN: ${esc(r.vin) || "-"}${r.creatDe ? " &nbsp;•&nbsp; deschisă de " + esc(r.creatDe) : ""}</div>
+        </div>
+        <div class="user-actions" style="display:flex; gap:6px; flex-wrap:wrap;">
+          ${r.driveUrl ? `<a href="${esc(r.driveUrl)}" target="_blank" rel="noopener" class="btn btn-ghost" style="width:auto; padding:6px 10px; font-size:12px;">Deschide PDF</a>` : `<span class="note" style="margin:0;">fără PDF</span>`}
+          ${r.folderUrl ? `<button type="button" class="btn btn-ghost btn-vezi-poze" data-idx="${idx}" style="width:auto; padding:6px 10px; font-size:12px;">Vezi poze</button>` : ""}
+        </div>
       </div>
-      <div class="user-actions" style="display:flex; gap:6px; flex-wrap:wrap;">
-        ${r.driveUrl ? `<a href="${esc(r.driveUrl)}" target="_blank" rel="noopener" class="btn btn-ghost" style="width:auto; padding:6px 10px; font-size:12px;">Deschide PDF</a>` : `<span class="note" style="margin:0;">fără PDF</span>`}
-        ${r.folderUrl ? `<a href="${esc(r.folderUrl)}" target="_blank" rel="noopener" class="btn btn-ghost" style="width:auto; padding:6px 10px; font-size:12px;">Vezi poze</a>` : ""}
-      </div>
+      <div class="poze-list" id="poze-list-${idx}"></div>
     </div>
   `).join("");
+}
+
+// La apăsarea "Vezi poze", aducem lista de poze direct din Drive (fără să
+// salvăm nimic în Sheet) și afișăm câte un link către fiecare poză în parte,
+// nu doar un link către tot folderul — mai comod pentru cineva care vrea
+// să vadă rapid o singură poză.
+async function showPozeForResult(idx) {
+  const r = state.centralResults[idx];
+  if (!r) return;
+  const box = document.getElementById(`poze-list-${idx}`);
+  box.innerHTML = `<div class="note" style="margin:8px 0 0;">Se încarcă pozele...</div>`;
+  const photos = await apiListPhotos(r.folderUrl);
+  if (!photos) { box.innerHTML = ""; return; }
+  if (photos.length === 0) {
+    box.innerHTML = `<div class="note" style="margin:8px 0 0;">Nicio poză găsită în folder.</div>`;
+    return;
+  }
+  box.innerHTML = `
+    <div style="display:flex; gap:6px; flex-wrap:wrap; margin-top:8px;">
+      ${photos.map((p, i) => `<a href="${esc(p.url)}" target="_blank" rel="noopener" class="btn btn-ghost" style="width:auto; padding:6px 10px; font-size:12px;">Poza ${i + 1}</a>`).join("")}
+    </div>
+  `;
 }
 
 function recordCardHtml(r) {
@@ -119,6 +144,14 @@ function afterArchiveRender() {
   };
   centralBtn.addEventListener("click", runCentralSearch);
   centralInput.addEventListener("keydown", (e) => { if (e.key === "Enter") runCentralSearch(); });
+
+  // delegare pe container, ca butoanele "Vezi poze" să funcționeze și după
+  // ce lista e re-randată (căutare nouă)
+  document.getElementById("central-results").addEventListener("click", (e) => {
+    const btn = e.target.closest(".btn-vezi-poze");
+    if (!btn) return;
+    showPozeForResult(parseInt(btn.dataset.idx, 10));
+  });
 }
 
 async function attemptPullByNumber(rawNumber) {
