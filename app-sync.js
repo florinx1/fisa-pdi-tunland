@@ -335,3 +335,15 @@ async function apiDeleteUser(adminNume, adminPin, targetNume) {
   });
   return await res.json();
 }
+
+// Ștergere definitivă a unei fișe (draft + rând finalizat + folder Drive) —
+// doar admin; folosită pentru curățarea fișelor de test. Vezi deleteRecord_
+// în Code.gs.
+async function apiDeleteRecord(adminNume, adminPin, docNumber) {
+  const res = await fetch(CONFIG.APPS_SCRIPT_URL, {
+    method: "POST",
+    headers: { "Content-Type": "text/plain;charset=utf-8" },
+    body: JSON.stringify({ action: "deleteRecord", adminNume, adminPin, docNumber }),
+  });
+  return await res.json();
+}

@@ -367,6 +367,13 @@ function emptyRecord() {
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
 
+    // Cine a deschis fișa (setat o singură dată, la creare, în startNewFisa
+    // din app-form.js) — util ca oricine vede fișa în „Fișe în așteptare”
+    // sau în arhivă să știe cine a pornit-o, chiar dacă între timp a trecut
+    // prin mai multe mâini (vânzător -> service -> finalizare).
+    creatDe: "",
+    creatRol: "",
+
     dataLivrarii: "",
     locatieLivrare: "sediu", // sediu | extern
 
@@ -489,6 +496,8 @@ function normalizeRecord(rec) {
   rec.poze = rec.poze || {};
   rec.verificareVanzari = rec.verificareVanzari || { status: null, motiv: "", de: "", rol: "", data: "", rezolvatDe: "", rezolvatData: "" };
   rec.verificareService = rec.verificareService || { status: null, motiv: "", de: "", rol: "", data: "", rezolvatDe: "", rezolvatData: "" };
+  rec.creatDe = rec.creatDe || "";
+  rec.creatRol = rec.creatRol || "";
   return rec;
 }
 

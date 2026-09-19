@@ -25,14 +25,21 @@ html, body {
 
 #app { min-height: 100vh; display: flex; flex-direction: column; }
 
-/* ---------- Header ---------- */
+/* ---------- Bara de sus (header + taburi), lipită împreună ---------- */
+/* header-ul și banda de taburi trebuie să rămână vizibile împreună la scroll;
+   dacă fiecare ar fi "sticky" separat la top:0, header-ul (mai sus în DOM,
+   z-index mai mare) ar acoperi complet banda de taburi de îndată ce aceasta
+   ar încerca să se lipească la același top:0 — de-asta le grupăm într-un
+   singur container sticky, în loc să ghicim înălțimea exactă a header-ului. */
+.app-topbar {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+}
 .app-header {
   background: linear-gradient(135deg, var(--navy), var(--navy-dark));
   color: white;
   padding: 14px 16px 12px;
-  position: sticky;
-  top: 0;
-  z-index: 50;
   box-shadow: 0 2px 8px rgba(0,0,0,0.15);
 }
 .app-header .brand {
@@ -70,9 +77,6 @@ html, body {
 .tabbar {
   display: flex;
   background: var(--navy-dark);
-  position: sticky;
-  top: 0;
-  z-index: 49;
 }
 .tabbar button {
   flex: 1;
@@ -606,3 +610,44 @@ canvas.sig-pad {
 .pending-meta { font-size: 12.5px; color: var(--steel); margin-top: 2px; }
 .pending-reason { font-size: 12.5px; color: #a33025; margin-top: 6px; }
 .pending-reason b { color: #a33025; }
+
+/* ---------- Ecran de start (Fișă nouă / Preia fișă) ---------- */
+.start-screen {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 16px 60px;
+  min-height: 60vh;
+}
+.start-title { font-size: 16px; font-weight: 700; color: var(--navy); margin-bottom: 22px; }
+.start-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+  max-width: 360px;
+}
+.start-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 4px;
+  background: white;
+  border: 2px solid var(--line);
+  border-radius: 16px;
+  padding: 22px 18px;
+  cursor: pointer;
+  transition: border-color .15s, transform .1s;
+}
+.start-btn:active { transform: scale(0.98); }
+#btn-start-new { border-color: var(--navy); }
+#btn-start-new:hover, #btn-start-new:active { background: var(--navy); }
+#btn-start-new:hover .start-btn-label, #btn-start-new:hover .start-btn-sub,
+#btn-start-new:hover .start-btn-icon,
+#btn-start-new:active .start-btn-label, #btn-start-new:active .start-btn-sub,
+#btn-start-new:active .start-btn-icon { color: white; }
+.start-btn-icon { font-size: 30px; color: var(--navy); line-height: 1; }
+.start-btn-label { font-size: 16px; font-weight: 800; color: var(--navy); }
+.start-btn-sub { font-size: 12px; color: var(--steel); font-weight: 400; }

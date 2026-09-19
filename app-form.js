@@ -2,8 +2,53 @@
    Randare formular (secțiunile 1-6) + legare câmpuri
    ============================================================ */
 
+// Ecranul de pornire — afișat pe tab-ul "Fișă curentă" atunci când
+// utilizatorul nu are nicio fișă deschisă (după logare, sau imediat după ce
+// a trimis/finalizat una): îl lasă să aleagă explicit între a începe o fișă
+// nouă sau a prelua una trimisă de un coleg, în loc să intre automat
+// într-un formular gol/străin.
+function renderStartScreen() {
+  return `
+    <div class="start-screen">
+      <div class="start-title">Ce dorești să faci?</div>
+      <div class="start-buttons">
+        <button class="start-btn" id="btn-start-new" type="button">
+          <span class="start-btn-icon">＋</span>
+          <span class="start-btn-label">Fișă nouă</span>
+          <span class="start-btn-sub">Deschide o fișă de predare-primire nouă, cu număr de înregistrare nou</span>
+        </button>
+        <button class="start-btn" id="btn-start-pull" type="button">
+          <span class="start-btn-icon">↺</span>
+          <span class="start-btn-label">Preia fișă</span>
+          <span class="start-btn-sub">Continuă o fișă trimisă de un coleg (din „Fișe în așteptare”)</span>
+        </button>
+      </div>
+    </div>
+  `;
+}
+
+function wireStartScreen() {
+  document.getElementById("btn-start-new").addEventListener("click", startNewFisa);
+  document.getElementById("btn-start-pull").addEventListener("click", () => {
+    state.tab = "pending";
+    render();
+  });
+}
+
+// Pornește o fișă complet nouă (număr de înregistrare atribuit în fundal) și
+// o deschide direct în formular. Folosită atât din ecranul de start, cât și
+// din butonul "Începe o fișă nouă" aflat jos în formular.
+function startNewFisa() {
+  state.current = emptyRecord();
+  state.current.creatDe = (state.session && state.session.nume) || "";
+  state.current.creatRol = (state.session && state.session.rol) || "";
+  render();
+  assignDocNumberAsync(state.current);
+}
+
 function renderForm() {
   const r = state.current;
+  if (!r) return renderStartScreen();
   const v = r.vehicul, c = r.client, d = r.documente, a = r.accesorii, p = r.pdi, s = r.semnaturi;
 
   return `
@@ -11,6 +56,7 @@ function renderForm() {
       <label>Notă</label>
       <div class="note">Fișa se completează pas cu pas; se salvează automat pe acest dispozitiv.
       La final apeși „Finalizează și generează PDF”.</div>
+      ${r.creatDe ? `<div class="note" style="margin-top:4px;">Fișă deschisă de <b>${esc(r.creatDe)}</b>${r.creatRol ? ` (${esc(r.creatRol)})` : ""}.</div>` : ""}
     </div>
 
     ${shareBannerHtml(r)}
@@ -116,6 +162,13 @@ function renderForm() {
         <label>Observații documente</label>
         <textarea id="f-obsDocumente">${esc(d.observatii)}</textarea>
       </div>
+      <div class="note" style="margin-top:10px;">
+        Predarea efectivă a mașinii către client se face de obicei chiar acum, de către
+        vânzător — de aceea semnăturile ICG și client sunt aici, nu la finalul fișei
+        (care e salvată de altcineva, din service, mai târziu).
+      </div>
+      ${sigBlockHtml("icg", "Predat de (ICG)", s.icgNume, s.icgSemnatura, VANZATORI)}
+      ${sigBlockHtml("client", "Primit de (client)", s.clientNume, s.clientSemnatura, null)}
       ${verificareBlockHtml("vanzari", r.verificareVanzari)}
     </div>
 
@@ -150,6 +203,7 @@ function renderForm() {
         <div class="field"><label>Data inspecției</label><input type="date" id="f-pdiData" value="${p.dataInspectiei || ""}"></div>
         <div class="field"><label>KM la testare</label><input type="text" inputmode="numeric" id="f-pdiKm" value="${esc(p.kmTestare)}"></div>
       </div>
+      ${sigBlockHtml("pdi", "Inspecție PDI (semnătură tehnician)", s.pdiNume, s.pdiSemnatura, PERSONAL_SERVICE)}
       <div class="note" style="margin-top:10px;">Verificarea de mai jos acoperă atât Inventarul accesorii (secțiunea 4), cât și Inspecția PDI (această secțiune).</div>
       ${verificareBlockHtml("service", r.verificareService)}
     </div>
@@ -161,14 +215,7 @@ function renderForm() {
       </div>
     </div>
 
-    <div class="section-bar">7&nbsp;&nbsp;Confirmare predare-primire</div>
-    <div class="section-body">
-      ${sigBlockHtml("icg", "Predat de (ICG)", s.icgNume, s.icgSemnatura, VANZATORI)}
-      ${sigBlockHtml("pdi", "Inspecție PDI", s.pdiNume, s.pdiSemnatura, PERSONAL_SERVICE)}
-      ${sigBlockHtml("client", "Primit de (client)", s.clientNume, s.clientSemnatura, null)}
-    </div>
-
-    <div class="section-bar">8&nbsp;&nbsp;Poze vehicul ${progressPill(pozeProgress(r))}</div>
+    <div class="section-bar">7&nbsp;&nbsp;Poze vehicul ${progressPill(pozeProgress(r))}</div>
     <div class="section-body">
       <div class="note" style="margin:0 0 10px;">
         Apasă pe fiecare tip de poză — se deschide direct camera telefonului.
@@ -364,6 +411,7 @@ function fotoSlotHtml(ft, value) {
 
 function afterFormRender() {
   const r = state.current;
+  if (!r) { wireStartScreen(); return; }
   const bind = (id, path, transform) => {
     const el = document.getElementById(id);
     if (!el) return;
@@ -505,9 +553,7 @@ function afterFormRender() {
   document.getElementById("btn-new").addEventListener("click", () => {
     if (confirm("Începi o fișă nouă? Fișa curentă rămâne salvată ca draft.")) {
       upsertCurrentIntoRecords();
-      state.current = emptyRecord();
-      render();
-      assignDocNumberAsync(state.current);
+      startNewFisa();
     }
   });
 
@@ -588,20 +634,25 @@ async function handleVerifClick(kind, value) {
     obj.rezolvatDe = (state.session && state.session.nume) || "";
     obj.rezolvatData = new Date().toISOString();
   }
-  autosave();
+  // fișa iese acum din sarcina acestui utilizator (trece la service, sau
+  // rămâne "în așteptare" pentru rezolvare/finalizare) — nu mai rămâne
+  // marcată drept "deschisă în formular" pe acest dispozitiv
+  r._openInForm = false;
   if (kind === "vanzari") {
-    await sendToServiceAfterVanzariCheck();
+    await sendToServiceAfterVanzariCheck(r);
   } else {
-    rerenderFormPreservingScroll();
+    await finishServiceCheck(r);
   }
+  // revine la ecranul de pornire (Fișă nouă / Preia fișă), ca operatorul să
+  // nu rămână "blocat" pe o fișă care nu mai e (momentan) în sarcina lui
+  if (state.current === r) state.current = null;
+  render();
 }
 
-async function sendToServiceAfterVanzariCheck() {
-  const r = state.current;
+async function sendToServiceAfterVanzariCheck(r) {
   if (!r.docNumber) r.docNumber = await requestDocNumber();
   r._shared = true;
   upsertCurrentIntoRecords();
-  rerenderFormPreservingScroll();
   if (!backendConfigured()) {
     showToast("Verificare salvată local. Backend-ul nu e configurat încă — trimite fișa manual colegului din service.", 4500);
     return;
@@ -611,7 +662,22 @@ async function sendToServiceAfterVanzariCheck() {
   if (result.ok) {
     showToast(`Trimisă către service — nr. fișă: ${r.docNumber}`, 4000);
   } else {
-    showToast("Nu s-a putut trimite automat (" + result.error + ") — folosește \"Retrimite acum\" mai sus.", 4500);
+    showToast("Nu s-a putut trimite automat (" + result.error + ") — colegul din service o poate prelua manual, cu numărul fișei, din \"Fișe în așteptare\".", 4500);
+  }
+}
+
+// Verificarea tehnicianului de service (Pass / Necesită intervenție) —
+// analog cu sendToServiceAfterVanzariCheck, dar fără destinatar următor:
+// doar sincronizăm rezultatul, ca oricine să-l vadă în "Fișe în așteptare".
+async function finishServiceCheck(r) {
+  upsertCurrentIntoRecords();
+  if (!backendConfigured() || !r._shared || !r.docNumber) return;
+  showToast("Se salvează verificarea...", 1200);
+  const result = await pushDraft(r);
+  if (result.ok) {
+    showToast(`Verificare salvată — fișă ${r.docNumber}`, 3000);
+  } else {
+    showToast("Nu s-a putut sincroniza (" + result.error + ") — verifică din \"Fișe în așteptare\".", 4000);
   }
 }
 
@@ -763,6 +829,18 @@ async function shareCurrentRecord() {
   }
 }
 
+// Instantaneu al conținutului relevant al fișei (fără câmpuri volatile),
+// folosit ca să detectăm dacă operatorul apasă "Finalizează" din nou fără să
+// fi schimbat nimic — caz în care nu mai retrimitem PDF-ul/pozele la Drive.
+function computeRecordSnapshot(r) {
+  const clone = JSON.parse(JSON.stringify(r));
+  delete clone.id;
+  delete clone.updatedAt;
+  delete clone._openInForm;
+  delete clone._lastFinalizedSnapshot;
+  return JSON.stringify(clone);
+}
+
 async function finalizeCurrentRecord() {
   const r = state.current;
   const rol = state.session && state.session.rol;
@@ -786,16 +864,22 @@ async function finalizeCurrentRecord() {
   if (!r.client.nume) {
     if (!confirm("Numele clientului nu este completat. Continui oricum?")) return;
   }
+
+  if (r.status === "finalizat" && r._lastFinalizedSnapshot === computeRecordSnapshot(r)) {
+    showToast(`Fișa ${r.docNumber} este deja salvată — nu s-a schimbat nimic.`, 3000);
+    return;
+  }
+
   if (!r.docNumber) {
     r.docNumber = await requestDocNumber();
   }
   r.status = "finalizat";
   r._openInForm = false;
+  r._lastFinalizedSnapshot = computeRecordSnapshot(r);
   upsertCurrentIntoRecords();
   generatePdf(r, { download: true, open: false });
   await syncRecord(r);
   showToast(`Fișă ${r.docNumber} finalizată`);
-  state.current = emptyRecord();
+  state.current = null;
   render();
-  assignDocNumberAsync(state.current);
 }

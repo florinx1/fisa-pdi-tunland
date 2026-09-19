@@ -51,10 +51,11 @@ function renderCentralResults() {
     <div class="user-card">
       <div class="user-main">
         <div class="user-name">${esc(r.clientNume) || "Client necompletat"}</div>
-        <div class="user-role">${esc(r.docNumber)} &nbsp;•&nbsp; ${esc(r.marcaModel)} &nbsp;•&nbsp; VIN: ${esc(r.vin) || "-"}</div>
+        <div class="user-role">${esc(r.docNumber)} &nbsp;•&nbsp; ${esc(r.marcaModel)} &nbsp;•&nbsp; VIN: ${esc(r.vin) || "-"}${r.creatDe ? " &nbsp;•&nbsp; deschisă de " + esc(r.creatDe) : ""}</div>
       </div>
-      <div class="user-actions">
+      <div class="user-actions" style="display:flex; gap:6px; flex-wrap:wrap;">
         ${r.driveUrl ? `<a href="${esc(r.driveUrl)}" target="_blank" rel="noopener" class="btn btn-ghost" style="width:auto; padding:6px 10px; font-size:12px;">Deschide PDF</a>` : `<span class="note" style="margin:0;">fără PDF</span>`}
+        ${r.folderUrl ? `<a href="${esc(r.folderUrl)}" target="_blank" rel="noopener" class="btn btn-ghost" style="width:auto; padding:6px 10px; font-size:12px;">Vezi poze</a>` : ""}
       </div>
     </div>
   `).join("");
@@ -140,9 +141,11 @@ async function attemptPullByNumber(rawNumber) {
 }
 
 function openRecordFromArchive(rec) {
+  const canDeleteRemote = isAdmin() && backendConfigured() && rec.docNumber;
   const action = prompt(
     `${rec.docNumber || "Draft"} — ${rec.client.nume || "client necompletat"}\n\n` +
-    `Scrie:\n"1" = deschide/editează\n"2" = regenerează PDF\n"3" = șterge fișa`,
+    `Scrie:\n"1" = deschide/editează\n"2" = regenerează PDF\n"3" = șterge de pe acest dispozitiv` +
+    (canDeleteRemote ? `\n"4" = șterge DEFINITIV (Sheet + Drive) — doar admin` : ""),
     "1"
   );
   if (action === "1") {
@@ -158,6 +161,20 @@ function openRecordFromArchive(rec) {
       state.records = state.records.filter(r => r.id !== rec.id);
       saveRecords();
       render();
+    }
+  } else if (action === "4" && canDeleteRemote) {
+    if (confirm(`Ștergi DEFINITIV fișa ${rec.docNumber} — rândul din Sheet, folderul din Drive (PDF + poze) și draftul, dacă mai există? Nu se poate anula.`)) {
+      showToast("Se șterge...", 1200);
+      apiDeleteRecord(state.session.nume, state.session.pin, rec.docNumber).then(result => {
+        if (result && result.ok) {
+          state.records = state.records.filter(r => r.id !== rec.id);
+          saveRecords();
+          showToast(`Fișa ${rec.docNumber} a fost ștearsă definitiv.`);
+          render();
+        } else {
+          showToast("Nu s-a putut șterge: " + ((result && result.error) || "eroare necunoscută"), 4000);
+        }
+      });
     }
   }
 }

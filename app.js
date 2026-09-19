@@ -102,7 +102,7 @@ function bootstrapAfterLogin() {
   applyCachedListePersonal(); // varianta locală cunoscută, disponibilă instant, înainte de răspunsul de rețea
   state.records = loadRecords();
   renderShell();
-  startNewOrResumeDraft();
+  resumeOpenDraftIfAny();
   render();
   updateOnlineIndicator();
   window.addEventListener("online", updateOnlineIndicator);
@@ -120,16 +120,14 @@ function bootstrapAfterLogin() {
   });
 }
 
-function startNewOrResumeDraft() {
-  // dacă există un draft neterminat foarte recent și fără client completat, îl redeschidem;
-  // altfel pornim o fișă nouă și îi atribuim imediat un număr de înregistrare
+function resumeOpenDraftIfAny() {
+  // reluăm automat DOAR un draft lăsat deschis chiar de acest dispozitiv
+  // (ex: pagina a fost reîmprospătată în timp ce lucra la o fișă). Dacă nu
+  // există un astfel de draft, NU mai pornim automat o fișă nouă — utilizatorul
+  // alege explicit din ecranul de start ("Fișă nouă" / "Preia fișă"), ca să nu
+  // rămână cu fișe goale abandonate sau să deschidă din greșeală fișa altcuiva.
   const openDraft = state.records.find(r => r.status === "draft" && r._openInForm);
-  if (openDraft) {
-    state.current = openDraft;
-  } else {
-    state.current = emptyRecord();
-    assignDocNumberAsync(state.current);
-  }
+  state.current = openDraft || null;
 }
 
 // Atribuie un număr de înregistrare (de la backend dacă e configurat/online,
@@ -159,25 +157,27 @@ function renderShell() {
     : "";
 
   document.getElementById("app").innerHTML = `
-    <header class="app-header">
-      <div class="brand">
-        <img src="logo-full-white.png" onerror="this.style.display='none'" alt="Inter Cargo Grup" class="brand-logo brand-logo-icg">
-        <div class="brand-divider"></div>
-        <img src="foton-logo-full-white.png" onerror="this.style.display='none'" alt="FOTON" class="brand-logo brand-logo-foton">
-        <div class="brand-text">
-          <div class="sub">${CONFIG.COMPANY_SUB}</div>
+    <div class="app-topbar">
+      <header class="app-header">
+        <div class="brand">
+          <img src="logo-full-white.png" onerror="this.style.display='none'" alt="Inter Cargo Grup" class="brand-logo brand-logo-icg">
+          <div class="brand-divider"></div>
+          <img src="foton-logo-full-white.png" onerror="this.style.display='none'" alt="FOTON" class="brand-logo brand-logo-foton">
+          <div class="brand-text">
+            <div class="sub">${CONFIG.COMPANY_SUB}</div>
+          </div>
         </div>
-      </div>
-      ${sessionBadge}
-      <div class="title" id="header-title">Fișă de predare-primire vehicul</div>
-      <div class="doc-number-display" id="header-doc-number"></div>
-    </header>
-    <nav class="tabbar">
-      <button data-tab="form" id="tab-form">Fișă curentă</button>
-      <button data-tab="archive" id="tab-archive">Arhivă</button>
-      <button data-tab="pending" id="tab-pending">Fișe în așteptare</button>
-      ${showUsersTab ? `<button data-tab="users" id="tab-users">Utilizatori</button>` : ""}
-    </nav>
+        ${sessionBadge}
+        <div class="title" id="header-title">Fișă de predare-primire vehicul</div>
+        <div class="doc-number-display" id="header-doc-number"></div>
+      </header>
+      <nav class="tabbar">
+        <button data-tab="form" id="tab-form">Fișă curentă</button>
+        <button data-tab="archive" id="tab-archive">Arhivă</button>
+        <button data-tab="pending" id="tab-pending">Fișe în așteptare</button>
+        ${showUsersTab ? `<button data-tab="users" id="tab-users">Utilizatori</button>` : ""}
+      </nav>
+    </div>
     <main id="main"></main>
     <div class="toast" id="toast"></div>
   `;
@@ -204,10 +204,15 @@ function render() {
   if (state.tab === "form") {
     main.innerHTML = renderForm();
     afterFormRender();
-    document.getElementById("header-title").textContent = "Fișă de predare-primire vehicul";
-    document.getElementById("header-doc-number").textContent = state.current.docNumber
-      ? state.current.docNumber
-      : "(număr atribuit la finalizare)";
+    if (state.current) {
+      document.getElementById("header-title").textContent = "Fișă de predare-primire vehicul";
+      document.getElementById("header-doc-number").textContent = state.current.docNumber
+        ? state.current.docNumber
+        : "(număr atribuit la finalizare)";
+    } else {
+      document.getElementById("header-title").textContent = "Fisa PDI Tunland G7";
+      document.getElementById("header-doc-number").textContent = "";
+    }
   } else if (state.tab === "archive") {
     main.innerHTML = renderArchive();
     afterArchiveRender();

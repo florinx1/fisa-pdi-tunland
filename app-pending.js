@@ -45,12 +45,16 @@ function pendingCardHtml(r) {
     reasons.push(`Service: <b>${esc(verifStatusLabel("service", sv.status))}</b>${sv.de ? " — " + esc(sv.de) : ""}${sv.motiv ? " (" + esc(sv.motiv) + ")" : ""}`);
   }
   const isRed = vz.status === "fail" || sv.status === "interventie";
+  const deleteBtn = isAdmin()
+    ? `<button class="btn btn-danger" data-delete-pending="${esc(r.docNumber)}" type="button" style="margin-top:8px; margin-left:8px; width:auto; padding:6px 10px; font-size:12px;">Șterge (admin)</button>`
+    : "";
   return `
     <div class="pending-card ${isRed ? "pending-red" : ""}">
       <div class="pending-doc">${esc(r.docNumber)}</div>
-      <div class="pending-meta">${esc(r.model) || "model necompletat"}${r.clientNume ? " &nbsp;•&nbsp; " + esc(r.clientNume) : ""}</div>
+      <div class="pending-meta">${esc(r.model) || "model necompletat"}${r.clientNume ? " &nbsp;•&nbsp; " + esc(r.clientNume) : ""}${r.creatDe ? " &nbsp;•&nbsp; deschisă de " + esc(r.creatDe) : ""}</div>
       ${reasons.map(h => `<div class="pending-reason">${h}</div>`).join("")}
       <button class="btn btn-secondary" data-open-pending="${esc(r.docNumber)}" type="button" style="margin-top:8px; width:auto; padding:6px 10px; font-size:12px;">Deschide fișa</button>
+      ${deleteBtn}
     </div>
   `;
 }
@@ -64,6 +68,20 @@ function afterPendingRender() {
 function wirePendingCardButtons() {
   document.querySelectorAll("[data-open-pending]").forEach(btn => {
     btn.addEventListener("click", () => attemptPullByNumber(btn.dataset.openPending));
+  });
+  document.querySelectorAll("[data-delete-pending]").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const docNumber = btn.dataset.deletePending;
+      if (!confirm(`Ștergi DEFINITIV fișa ${docNumber} (draftul de pe server și folderul din Drive, dacă există)? Nu se poate anula.`)) return;
+      showToast("Se șterge...", 1200);
+      const result = await apiDeleteRecord(state.session.nume, state.session.pin, docNumber);
+      if (result && result.ok) {
+        showToast(`Fișa ${docNumber} a fost ștearsă.`);
+        loadPendingRecords();
+      } else {
+        showToast("Nu s-a putut șterge: " + ((result && result.error) || "eroare necunoscută"), 4000);
+      }
+    });
   });
 }
 
