@@ -5,7 +5,7 @@
 
 // !!! După ce publici Apps Script-ul ca Web App, pune URL-ul aici !!!
 const CONFIG = {
-  APPS_SCRIPT_URL: "", // ex: "https://script.google.com/macros/s/AKfycb.../exec"
+  APPS_SCRIPT_URL: "https://script.google.com/macros/s/AKfycbxQbJ9YToh208dXSEgOG4s1QOGc2o5MNRwOIhc_OsD0BYSY72s7OwIcwDFTFPb5nBJkXw/exec",
   COMPANY_NAME: "INTER CARGO GRUP",
   COMPANY_SUB: "Distribuitor comercial  •  Bragadiru, jud. Ilfov, România",
   COMPANY_DEPT: "Departament Aftersales & Piese de schimb",
