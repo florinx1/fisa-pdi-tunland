@@ -12,13 +12,13 @@ async function syncRecord(record) {
   if (!backendConfigured()) {
     record._pendingSync = true;
     upsertCurrentIntoRecordsSafe(record);
-    return;
+    return { ok: false, error: "backend neconfigurat" };
   }
   if (!navigator.onLine) {
     record._pendingSync = true;
     upsertCurrentIntoRecordsSafe(record);
     showToast("Offline — fișa se va sincroniza automat la reconectare");
-    return;
+    return { ok: false, error: "offline" };
   }
 
   try {
@@ -56,6 +56,7 @@ async function syncRecord(record) {
       }
       upsertCurrentIntoRecordsSafe(record);
       showToast("Sincronizat cu Google Drive ✓");
+      return { ok: true };
     } else {
       throw new Error((json && json.error) || "răspuns necunoscut de la server");
     }
@@ -64,6 +65,7 @@ async function syncRecord(record) {
     record._pendingSync = true;
     upsertCurrentIntoRecordsSafe(record);
     showToast("Nu s-a putut sincroniza acum — reîncerc mai târziu");
+    return { ok: false, error: String((e && e.message) || e) };
   }
 }
 
@@ -81,13 +83,17 @@ function stripTransient(record) {
   return clone;
 }
 
-// Construiește lista de poze de trimis la backend (doar cele făcute local,
-// nu deja marcate ca "încărcate" — vezi syncRecord). Fiecare poză devine un
-// fișier separat în Drive, în folderul dedicat livrării, nu text în Sheet.
+// Construiește lista de poze de trimis la backend ca PLASĂ DE SIGURANȚĂ la
+// finalizare — de obicei goală, pentru că fiecare poză a fost deja trimisă
+// separat, imediat după ce a fost făcută (vezi uploadPhotoInBackground).
+// Include aici DOAR pozele făcute local care nu au fost încă confirmate ca
+// urcate (ex: au fost făcute offline, sau upload-ul imediat a eșuat) — nu
+// retrimitem inutil poze deja în Drive, ca să păstrăm acest request mic.
 function buildPozePayload(record) {
   if (!record.poze) return [];
+  const uploaded = record.pozeUploaded || {};
   return FOTO_TIPURI
-    .filter(ft => typeof record.poze[ft.key] === "string" && record.poze[ft.key])
+    .filter(ft => typeof record.poze[ft.key] === "string" && record.poze[ft.key] && !uploaded[ft.key])
     .map(ft => ({
       key: ft.key,
       filename: ft.key + ".jpg",
@@ -107,6 +113,19 @@ async function trySyncPending() {
 window.addEventListener("online", () => {
   setTimeout(trySyncPending, 1500);
 });
+
+// și, în plus, periodic — o fișă poate rămâne "în așteptare" chiar și fără
+// nicio tranziție de conexiune (ex: serverul a răspuns cu eroare o singură
+// dată), caz în care evenimentul "online" de mai sus nu s-ar mai declanșa
+// niciodată în restul sesiunii. La fiecare 3 minute, cât timp aplicația e
+// deschisă, mai încercăm o dată.
+const __pendingSyncIntervalId = setInterval(trySyncPending, 3 * 60 * 1000);
+// .unref() există doar în Node (folosit de testele automate, care rulează
+// acest fișier direct în jsdom) — într-un browser adevărat nu există și nu
+// trebuie apelat, altfel ar arunca eroare la încărcarea aplicației.
+if (typeof __pendingSyncIntervalId === "object" && typeof __pendingSyncIntervalId.unref === "function") {
+  __pendingSyncIntervalId.unref();
+}
 
 // obține următorul număr de document de la backend (dacă e configurat),
 // altfel folosește contorul local
@@ -174,6 +193,44 @@ async function apiUploadSignature(record, who, dataBase64) {
 
 async function apiGetSignatureImage(fileId) {
   const res = await fetch(`${CONFIG.APPS_SCRIPT_URL}?action=getSignatureImage&fileId=${encodeURIComponent(fileId)}`);
+  return await res.json();
+}
+
+// Trimite O SINGURĂ poză către Drive, imediat după ce a fost făcută pe
+// dispozitiv — la fel ca semnăturile, nu se mai așteaptă până la
+// "Finalizează" ca să urce toate pozele deodată (vezi comentariul din
+// uploadPhoto_, Code.gs, pentru de ce s-a schimbat asta). Best-effort: dacă
+// eșuează (offline, eroare server), poza rămâne local și e retrimisă la
+// finalizare, prin buildPozePayload — nu se pierde, doar ajunge mai târziu.
+async function uploadPhotoInBackground(record, key, dataUrl) {
+  if (!backendConfigured() || !navigator.onLine) return;
+  try {
+    const dataBase64 = dataUrl.split(",")[1] || dataUrl;
+    const result = await apiUploadPhoto(record, key, dataBase64);
+    if (result && result.ok) {
+      record.pozeUploaded = record.pozeUploaded || {};
+      record.pozeUploaded[key] = true;
+      if (result.folderUrl) record.folderUrl = result.folderUrl;
+      upsertCurrentIntoRecordsSafe(record);
+    }
+  } catch (e) {
+    console.error("Eroare urcare poză", key, e);
+    // best-effort — poza rămâne local, se retrimite la "Finalizează"
+  }
+}
+
+async function apiUploadPhoto(record, key, dataBase64) {
+  const res = await fetch(CONFIG.APPS_SCRIPT_URL, {
+    method: "POST",
+    headers: { "Content-Type": "text/plain;charset=utf-8" },
+    body: JSON.stringify({
+      action: "uploadPhoto",
+      key,
+      dataBase64,
+      vehicul: record.vehicul,
+      dataLivrarii: record.dataLivrarii,
+    }),
+  });
   return await res.json();
 }
 

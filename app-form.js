@@ -720,7 +720,11 @@ function wireSingleFotoInput(input, r) {
     try {
       const dataUrl = await compressPhoto(file, 1600, 0.72);
       r.poze[key] = dataUrl;
+      if (r.pozeUploaded) delete r.pozeUploaded[key]; // poza a fost refăcută — trebuie reurcată
       autosave();
+      // urcăm poza în Drive chiar acum, separat, în fundal — nu așteptăm
+      // butonul "Finalizează" (vezi uploadPhotoInBackground, app-sync.js)
+      uploadPhotoInBackground(r, key, dataUrl);
       const ft = FOTO_TIPURI.find(f => f.key === key);
       if (slot && ft) {
         slot.outerHTML = fotoSlotHtml(ft, dataUrl);
@@ -905,8 +909,21 @@ async function finalizeCurrentRecord() {
   r._lastFinalizedSnapshot = computeRecordSnapshot(r);
   upsertCurrentIntoRecords();
   generatePdf(r, { download: true, open: false });
-  await syncRecord(r);
-  showToast(`Fișă ${r.docNumber} finalizată`);
+  // syncRecord() ne spune explicit dacă PDF-ul + pozele au ajuns cu adevărat
+  // în Drive — dacă am arăta mereu "finalizată" indiferent de rezultat, un
+  // eșec de sincronizare (rețea, server) ar trece complet neobservat: PDF-ul
+  // local tot se descarcă, deci utilizatorul n-ar avea niciun alt semn că pe
+  // server nu s-a salvat nimic.
+  const syncResult = await syncRecord(r);
+  if (syncResult && syncResult.ok) {
+    showToast(`Fișă ${r.docNumber} finalizată`);
+  } else {
+    showToast(
+      `Fișă ${r.docNumber} salvată local, dar NU s-a încărcat încă în Drive ` +
+      `(se reîncearcă automat la reconectare) — verifică ulterior în Arhivă.`,
+      6000
+    );
+  }
   state.current = null;
   state.tab = "start";
   render();

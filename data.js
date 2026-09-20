@@ -453,6 +453,7 @@ function emptyRecord() {
     observatiiGenerale: "",
 
     poze: {},            // key (din FOTO_TIPURI) -> dataURL jpeg (comprimat pe dispozitiv) | absent = nefăcută
+    pozeUploaded: {},    // key -> true, imediat ce poza a ajuns cu succes în Drive (vezi uploadPhotoInBackground)
 
     semnaturi: {
       icgNume: "",
@@ -495,6 +496,7 @@ function normalizeRecord(rec) {
   rec.accesorii = rec.accesorii || { checks: {}, nrChei: "", nrCartele: "", observatii: "" };
   if (!rec.accesorii.alteAccesorii) rec.accesorii.alteAccesorii = ALTE_ACCESORII_OPTIUNI[0] || "";
   rec.poze = rec.poze || {};
+  rec.pozeUploaded = rec.pozeUploaded || {};
   rec.verificareVanzari = rec.verificareVanzari || { status: null, motiv: "", de: "", rol: "", data: "", rezolvatDe: "", rezolvatData: "" };
   rec.verificareService = rec.verificareService || { status: null, motiv: "", de: "", rol: "", data: "", rezolvatDe: "", rezolvatData: "" };
   rec.creatDe = rec.creatDe || "";
