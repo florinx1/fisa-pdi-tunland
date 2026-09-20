@@ -68,7 +68,8 @@ function renderForm() {
     <div class="field">
       <label>Notă</label>
       <div class="note">Fișa se completează pas cu pas; se salvează automat pe acest dispozitiv.
-      La final apeși „Finalizează și generează PDF”.</div>
+      Apasă „Pass”/„Fail” la verificări fără să pierzi fișa — ea rămâne deschisă aici până apeși
+      „Trimite mai departe” (predare către coleg) sau „Finalizează și generează PDF” (gata de tot).</div>
       ${r.creatDe ? `<div class="note" style="margin-top:4px;">Fișă deschisă de <b>${esc(r.creatDe)}</b>${r.creatRol ? ` (${esc(r.creatRol)})` : ""}.</div>` : ""}
     </div>
 
@@ -253,6 +254,7 @@ function renderForm() {
     ${verifSummaryBannerHtml(r)}
     <div class="bottom-bar">
       <button class="btn btn-secondary" id="btn-save-draft">Salvează draft</button>
+      <button class="btn btn-secondary" id="btn-send-forward">Trimite mai departe</button>
       <button class="btn btn-primary" id="btn-finalize">Finalizează și generează PDF</button>
     </div>
   `;
@@ -608,6 +610,10 @@ function afterFormRender() {
     showToast("Draft salvat pe acest dispozitiv");
   });
 
+  document.getElementById("btn-send-forward").addEventListener("click", () => {
+    trimiteFisaMaiDeparteSiInchide();
+  });
+
   document.getElementById("btn-pdf-preview").addEventListener("click", () => {
     generatePdf(state.current, { download: false, open: true });
   });
@@ -625,9 +631,13 @@ function afterFormRender() {
 
 // Vânzătorul confirmă Pass/Fail pe partea lui (documente + date deschidere)
 // sau tehnicianul de service confirmă Pass/Necesită intervenție pe partea
-// lui (accesorii + PDI). Motivul e obligatoriu la respingere. Indiferent de
-// rezultat, verificarea vânzătorului DECLANȘEAZĂ automat trimiterea fișei
-// către service (nu mai trebuie apăsat separat "Trimite fișa mai departe").
+// lui (accesorii + PDI). Motivul e obligatoriu la respingere. Apăsarea Pass/
+// Fail NU mai trimite fișa automat și nu mai închide formularul — doar
+// înregistrează rezultatul verificării (cine, când, ce motiv). Fișa rămâne
+// deschisă pe tab-ul "Fișă curentă" până când operatorul apasă explicit
+// butonul "Trimite mai departe" (vezi trimiteFisaMaiDeparteSiInchide), ca să
+// apuce să verifice tot înainte de a trimite/finaliza — nu mai riscă să fie
+// scos din fișă chiar în momentul în care a apăsat Pass.
 async function handleVerifClick(kind, value) {
   const r = state.current;
   const key = kind === "vanzari" ? "verificareVanzari" : "verificareService";
@@ -653,51 +663,39 @@ async function handleVerifClick(kind, value) {
     obj.rezolvatDe = (state.session && state.session.nume) || "";
     obj.rezolvatData = new Date().toISOString();
   }
-  // fișa iese acum din sarcina acestui utilizator (trece la service, sau
-  // rămâne "în așteptare" pentru rezolvare/finalizare) — nu mai rămâne
-  // marcată drept "deschisă în formular" pe acest dispozitiv
+  autosave();
+  render();
+}
+
+// Butonul "Trimite mai departe" din bara de jos (între "Salvează draft" și
+// "Finalizează și generează PDF"): trimite explicit fișa către server, cu
+// starea curentă a verificărilor (Pass/Fail/Necesită intervenție, cu
+// mențiunile deja completate mai sus), ca oricine să o vadă în "Fișe în
+// așteptare" — apoi închide fișa pe acest dispozitiv și revine la "Start".
+// Înlocuiește trimiterea automată de dinainte (care se declanșa direct la
+// apăsarea Pass și nu-i lăsa timp operatorului să mai facă altceva în fișă).
+async function trimiteFisaMaiDeparteSiInchide() {
+  const r = state.current;
+  if (!r) return;
+  if (!r.docNumber) r.docNumber = await requestDocNumber();
+  r._shared = true;
   r._openInForm = false;
-  if (kind === "vanzari") {
-    await sendToServiceAfterVanzariCheck(r);
+  upsertCurrentIntoRecords();
+  if (!backendConfigured()) {
+    showToast("Salvată local — backend-ul nu e configurat încă, trimite fișa manual colegului.", 4500);
   } else {
-    await finishServiceCheck(r);
+    showToast("Se trimite fișa mai departe...", 1500);
+    const result = await pushDraft(r);
+    if (result.ok) {
+      showToast(`Fișă ${r.docNumber} trimisă mai departe`, 3000);
+    } else {
+      showToast("Nu s-a putut trimite automat (" + result.error + ") — poate fi preluată manual, cu numărul fișei, din \"Fișe în așteptare\".", 4500);
+    }
   }
   // revine la ecranul de pornire (Fișă nouă / Preia fișă), ca operatorul să
   // nu rămână "blocat" pe o fișă care nu mai e (momentan) în sarcina lui
   if (state.current === r) { state.current = null; state.tab = "start"; }
   render();
-}
-
-async function sendToServiceAfterVanzariCheck(r) {
-  if (!r.docNumber) r.docNumber = await requestDocNumber();
-  r._shared = true;
-  upsertCurrentIntoRecords();
-  if (!backendConfigured()) {
-    showToast("Verificare salvată local. Backend-ul nu e configurat încă — trimite fișa manual colegului din service.", 4500);
-    return;
-  }
-  showToast("Se trimite fișa către service...", 1500);
-  const result = await pushDraft(r);
-  if (result.ok) {
-    showToast(`Trimisă către service — nr. fișă: ${r.docNumber}`, 4000);
-  } else {
-    showToast("Nu s-a putut trimite automat (" + result.error + ") — colegul din service o poate prelua manual, cu numărul fișei, din \"Fișe în așteptare\".", 4500);
-  }
-}
-
-// Verificarea tehnicianului de service (Pass / Necesită intervenție) —
-// analog cu sendToServiceAfterVanzariCheck, dar fără destinatar următor:
-// doar sincronizăm rezultatul, ca oricine să-l vadă în "Fișe în așteptare".
-async function finishServiceCheck(r) {
-  upsertCurrentIntoRecords();
-  if (!backendConfigured() || !r._shared || !r.docNumber) return;
-  showToast("Se salvează verificarea...", 1200);
-  const result = await pushDraft(r);
-  if (result.ok) {
-    showToast(`Verificare salvată — fișă ${r.docNumber}`, 3000);
-  } else {
-    showToast("Nu s-a putut sincroniza (" + result.error + ") — verifică din \"Fișe în așteptare\".", 4000);
-  }
 }
 
 // ---------------- Poze vehicul (cameră + compresie pe dispozitiv) ----------------
@@ -807,12 +805,18 @@ function setPath(obj, path, value) {
 
 let autosaveTimer = null;
 function autosave() {
+  const r = state.current;
   clearTimeout(autosaveTimer);
   autosaveTimer = setTimeout(async () => {
-    state.current._openInForm = true;
+    // fișa poate fi fost închisă între timp (ex: "Trimite mai departe" sau
+    // "Finalizează" apăsat chiar în fereastra celor 600ms de debounce) — nu
+    // mai avem ce salva/trimite în acest caz, ca să nu rescriem cu date
+    // vechi un state.current care between timp a devenit altă fișă sau null.
+    if (state.current !== r) return;
+    r._openInForm = true;
     upsertCurrentIntoRecords();
-    if (state.current._shared && state.current.docNumber) {
-      await pushDraft(state.current); // best-effort, silențios — nu blocăm utilizatorul
+    if (r._shared && r.docNumber) {
+      await pushDraft(r); // best-effort, silențios — nu blocăm utilizatorul
     }
   }, 600);
 }

@@ -162,15 +162,17 @@ function renderShell() {
   document.getElementById("app").innerHTML = `
     <div class="app-topbar">
       <header class="app-header">
-        <div class="brand">
-          <img src="logo-full-white.png" onerror="this.style.display='none'" alt="Inter Cargo Grup" class="brand-logo brand-logo-icg">
-          <div class="brand-divider"></div>
-          <img src="foton-logo-full-white.png" onerror="this.style.display='none'" alt="FOTON" class="brand-logo brand-logo-foton">
-          <div class="brand-text">
-            <div class="sub">${CONFIG.COMPANY_SUB}</div>
+        <div class="header-top-row">
+          <div class="brand">
+            <img src="logo-full-white.png" onerror="this.style.display='none'" alt="Inter Cargo Grup" class="brand-logo brand-logo-icg">
+            <div class="brand-divider"></div>
+            <img src="foton-logo-full-white.png" onerror="this.style.display='none'" alt="FOTON" class="brand-logo brand-logo-foton">
+            <div class="brand-text">
+              <div class="sub">${CONFIG.COMPANY_SUB}</div>
+            </div>
           </div>
+          ${sessionBadge}
         </div>
-        ${sessionBadge}
         <div class="title" id="header-title">Fișă predare-primire vehicul</div>
         <div class="doc-number-display" id="header-doc-number"></div>
       </header>

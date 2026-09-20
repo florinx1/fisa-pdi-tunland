@@ -39,13 +39,33 @@ html, body {
 .app-header {
   background: linear-gradient(135deg, var(--navy), var(--navy-dark));
   color: white;
-  padding: 14px 16px 12px;
+  /* pe telefoane cu notch/bară de sistem (mai ales iOS, cu
+     viewport-fit=cover și status-bar-style black-translucent), conținutul
+     paginii se desenează sub bara de sistem — fără acest padding suplimentar,
+     rândul cu sigla/numele firmei rămâne acoperit de ceasul/bateria telefonului.
+     env(safe-area-inset-top) e 0 pe telefoane fără notch, deci nu strică nimic acolo. */
+  padding: calc(14px + env(safe-area-inset-top)) calc(16px + env(safe-area-inset-right)) 12px calc(16px + env(safe-area-inset-left));
   box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+}
+/* rândul cu sigle + numele/rolul contului logat: aici era problema din
+   captura de ecran — insigna de sesiune ("Nume · admin — Schimbă PIN" /
+   "Ieșire") era poziționată absolut peste rândul cu sigle, iar textul lung
+   de sub sigle ("Distribuitor comercial oficial... Bragadiru, jud. Ilfov,
+   România") se întindea pe sub ea și cele două se suprapuneau vizual. Acum
+   e un rând flex normal, cu spațiu împărțit corect între cele două zone. */
+.header-top-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 .app-header .brand {
   display: flex;
   align-items: center;
   gap: 10px;
+  min-width: 0;
+  flex: 1 1 auto;
 }
 .app-header .brand img.brand-logo {
   height: 26px;
@@ -56,6 +76,9 @@ html, body {
   width: 1px;
   height: 22px;
   background: rgba(255,255,255,0.3);
+}
+.app-header .brand-text {
+  min-width: 0;
 }
 .app-header .brand-text .name {
   font-weight: 700;
@@ -78,15 +101,30 @@ html, body {
   display: flex;
   background: var(--navy-dark);
   overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  /* la fel ca la header, evităm ca marginile ecranului (notch/colțuri rotunjite
+     în peisaj, sau bara de "home" pe telefoane fără butoane) să acopere primul
+     sau ultimul buton din bara de taburi */
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
 }
 .tabbar button {
-  flex: 1;
-  min-width: 78px;
+  /* important: flex:1 (flex-basis:0%) împreună cu min-width forța pe telefoanele
+     cu ecran îngust (ex. 360-390px lățime) un calcul de lățime instabil — pe unele
+     motoare de randare din browserele mobile, cele 5 taburi ajungeau să se
+     comprime inegal și să se suprapună vizual în loc să apară scrollul orizontal.
+     flex: 0 0 auto (fiecare buton își ia doar lățimea de care are nevoie) +
+     overflow-x: auto pe container e comportamentul robust: pe ecrane suficient
+     de late toate cele 5 taburi încap unul lângă altul, iar pe ecrane foarte
+     înguste bara devine derulabilă orizontal, fără suprapuneri. */
+  flex: 0 0 auto;
+  min-width: 20%;
+  max-width: none;
   background: transparent;
   border: none;
   color: rgba(255,255,255,0.65);
-  padding: 11px 6px;
-  font-size: 13.5px;
+  padding: 11px 4px;
+  font-size: 12.5px;
   font-weight: 600;
   border-bottom: 3px solid transparent;
   white-space: nowrap;
@@ -94,6 +132,9 @@ html, body {
 .tabbar button.active {
   color: white;
   border-bottom-color: #6fa8dc;
+}
+@media (max-width: 420px) {
+  .tabbar button { font-size: 11.5px; padding: 10px 3px; }
 }
 
 main { flex: 1; padding: 14px 12px 90px; max-width: 760px; margin: 0 auto; width: 100%; }
@@ -525,11 +566,11 @@ canvas.sig-pad {
 }
 
 .session-badge-group {
-  position: absolute;
-  top: 14px;
-  right: 16px;
   display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
   gap: 6px;
+  flex: 0 0 auto;
 }
 .session-badge {
   background: rgba(255,255,255,0.14);
