@@ -85,15 +85,15 @@ function stripTransient(record) {
 
 // Construiește lista de poze de trimis la backend ca PLASĂ DE SIGURANȚĂ la
 // finalizare — de obicei goală, pentru că fiecare poză a fost deja trimisă
-// separat, imediat după ce a fost făcută (vezi uploadPhotoInBackground).
-// Include aici DOAR pozele făcute local care nu au fost încă confirmate ca
-// urcate (ex: au fost făcute offline, sau upload-ul imediat a eșuat) — nu
-// retrimitem inutil poze deja în Drive, ca să păstrăm acest request mic.
+// separat, imediat după ce a fost făcută (vezi uploadPhotoInBackground), caz
+// în care record.poze[key] a fost deja înlocuit cu `true` (vezi mai jos) —
+// exact ca la o poză deja urcată, nu mai apare aici ca "de trimis". Include
+// DOAR pozele făcute local pentru care upload-ul imediat a eșuat sau nu a
+// apucat să se termine (ex: au fost făcute offline).
 function buildPozePayload(record) {
   if (!record.poze) return [];
-  const uploaded = record.pozeUploaded || {};
   return FOTO_TIPURI
-    .filter(ft => typeof record.poze[ft.key] === "string" && record.poze[ft.key] && !uploaded[ft.key])
+    .filter(ft => typeof record.poze[ft.key] === "string" && record.poze[ft.key])
     .map(ft => ({
       key: ft.key,
       filename: ft.key + ".jpg",
@@ -208,8 +208,11 @@ async function uploadPhotoInBackground(record, key, dataUrl) {
     const dataBase64 = dataUrl.split(",")[1] || dataUrl;
     const result = await apiUploadPhoto(record, key, dataBase64);
     if (result && result.ok) {
-      record.pozeUploaded = record.pozeUploaded || {};
-      record.pozeUploaded[key] = true;
+      // Poza a ajuns cu succes în Drive — o "aplatizăm" la `true` local, exact
+      // ca la semnături, ca să eliberăm spațiul din localStorage ocupat de
+      // dataURL-ul mare (altfel telefonul rămâne cu toate pozele în format
+      // complet și, după câteva fișe, apare eroarea "spațiu insuficient").
+      record.poze[key] = true;
       if (result.folderUrl) record.folderUrl = result.folderUrl;
       upsertCurrentIntoRecordsSafe(record);
     }

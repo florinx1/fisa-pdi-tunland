@@ -720,7 +720,6 @@ function wireSingleFotoInput(input, r) {
     try {
       const dataUrl = await compressPhoto(file, 1600, 0.72);
       r.poze[key] = dataUrl;
-      if (r.pozeUploaded) delete r.pozeUploaded[key]; // poza a fost refăcută — trebuie reurcată
       autosave();
       // urcăm poza în Drive chiar acum, separat, în fundal — nu așteptăm
       // butonul "Finalizează" (vezi uploadPhotoInBackground, app-sync.js)

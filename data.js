@@ -452,8 +452,7 @@ function emptyRecord() {
 
     observatiiGenerale: "",
 
-    poze: {},            // key (din FOTO_TIPURI) -> dataURL jpeg (comprimat pe dispozitiv) | absent = nefăcută
-    pozeUploaded: {},    // key -> true, imediat ce poza a ajuns cu succes în Drive (vezi uploadPhotoInBackground)
+    poze: {},            // key (din FOTO_TIPURI) -> dataURL jpeg (comprimat pe dispozitiv) | true (urcată deja în Drive) | absent = nefăcută
 
     semnaturi: {
       icgNume: "",
@@ -496,7 +495,19 @@ function normalizeRecord(rec) {
   rec.accesorii = rec.accesorii || { checks: {}, nrChei: "", nrCartele: "", observatii: "" };
   if (!rec.accesorii.alteAccesorii) rec.accesorii.alteAccesorii = ALTE_ACCESORII_OPTIUNI[0] || "";
   rec.poze = rec.poze || {};
-  rec.pozeUploaded = rec.pozeUploaded || {};
+  // Fișe finalizate mai vechi (dinaintea reîncercării automate robuste) pot
+  // avea poze rămase ca dataURL complet în localStorage, pentru că nu s-au
+  // urcat niciodată cu succes în Drive — exact ce a umplut spațiul de stocare
+  // de pe telefon și a dus la eroarea "spațiu insuficient" la orice salvare
+  // nouă. Le marcăm pentru reîncercare automată (trySyncPending, deja apelat
+  // la fiecare pornire/reconectare): la următoarea sincronizare reușită,
+  // poza e înlocuită cu `true` (vezi syncRecord) și spațiul se eliberează.
+  if (rec.status === "finalizat" && !rec._pendingSync) {
+    const arePozeNeurcate = Object.keys(rec.poze).some(
+      k => typeof rec.poze[k] === "string" && rec.poze[k]
+    );
+    if (arePozeNeurcate) rec._pendingSync = true;
+  }
   rec.verificareVanzari = rec.verificareVanzari || { status: null, motiv: "", de: "", rol: "", data: "", rezolvatDe: "", rezolvatData: "" };
   rec.verificareService = rec.verificareService || { status: null, motiv: "", de: "", rol: "", data: "", rezolvatDe: "", rezolvatData: "" };
   rec.creatDe = rec.creatDe || "";
