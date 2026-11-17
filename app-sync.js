@@ -215,6 +215,9 @@ async function uploadPhotoInBackground(record, key, dataUrl) {
       record.poze[key] = true;
       if (result.folderUrl) record.folderUrl = result.folderUrl;
       upsertCurrentIntoRecordsSafe(record);
+      // fișa e partajată: draftul de pe server a fost probabil trimis ÎNAINTE
+      // ca poza să ajungă în Drive — îl retrimitem, ca cine preia fișa să o vadă
+      if (record._shared && record.docNumber) pushDraft(record);
     }
   } catch (e) {
     console.error("Eroare urcare poză", key, e);
@@ -262,7 +265,13 @@ async function pushDraft(record) {
     // pe celulă) — pozele (base64) NU încap acolo și oricum se urcă separat,
     // direct în Drive, doar la finalizare (syncRecord); aici le excludem.
     const recordForDraft = stripTransient(record);
-    delete recordForDraft.poze;
+    // Pozele (dataURL) nu încap în Sheet — dar semnul "deja urcată în Drive"
+    // (true) e minuscul și TREBUIE să ajungă la cine preia fișa, altfel vede
+    // toate sloturile goale deși pozele sunt în Drive. Poza încă locală
+    // (upload eșuat/în curs) NU se marchează: nu e în Drive.
+    const pozeFlags = {};
+    Object.keys(record.poze || {}).forEach(k => { if (record.poze[k] === true) pozeFlags[k] = true; });
+    recordForDraft.poze = pozeFlags;
     await offloadLargeSignatures_(record, recordForDraft);
     const res = await fetch(CONFIG.APPS_SCRIPT_URL, {
       method: "POST",
@@ -289,7 +298,11 @@ async function pullDraft(docNumber) {
   try {
     const res = await fetch(`${CONFIG.APPS_SCRIPT_URL}?action=getDraft&docNumber=${encodeURIComponent(docNumber)}`);
     const json = await res.json();
-    if (json && json.ok) return normalizeRecord(json.record);
+    if (json && json.ok) {
+      const rec = normalizeRecord(json.record);
+      await markPhotosFoundInDrive_(rec);
+      return rec;
+    }
     showToast((json && json.error) || "Fișa nu a fost găsită.");
     return null;
   } catch (e) {
@@ -297,6 +310,21 @@ async function pullDraft(docNumber) {
     showToast("Eroare de conexiune — încearcă din nou.");
     return null;
   }
+}
+
+// Plasă de siguranță la preluarea unei fișe: draftul poate fi mai vechi decât
+// pozele (ex. trimis înainte de upload). Dacă fișa are folderul din Drive,
+// vedem ce poze există acolo (<key>.jpg) și le marcăm ca urcate.
+async function markPhotosFoundInDrive_(rec) {
+  if (!rec || !rec.folderUrl) return;
+  const photos = await apiListPhotos(rec.folderUrl);
+  if (!photos) return;
+  const names = new Set(photos.map(p => p.name));
+  FOTO_TIPURI.forEach(ft => {
+    if (names.has(ft.key + ".jpg") && !(typeof rec.poze[ft.key] === "string" && rec.poze[ft.key])) {
+      rec.poze[ft.key] = true;
+    }
+  });
 }
 
 // ---------------- Căutare în arhiva centrală (Drive/Sheet) ----------------
